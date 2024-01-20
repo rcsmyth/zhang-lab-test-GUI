@@ -4,5 +4,4 @@ V1:
 
 V2: 
 
-https://github.com/rcsmyth/zhang-lab-test-GUI/assets/56563089/262444fd-85c1-4615-907b-4b5f0b0bfd13
-
+![ezgif-4-1ce27f1d89](https://github.com/rcsmyth/zhang-lab-test-GUI/assets/56563089/0307fc72-a5a8-4ba8-872d-3d3b2fe16d3a)
