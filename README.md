@@ -1,7 +1,8 @@
 # zhang-lab-test-GUI
 
 version 4:
-![Screen Shot 2024-01-22 at 11 22 11 PM](https://github.com/rcsmyth/zhang-lab-test-GUI/assets/56563089/fa47c7d2-77bd-40ce-b9a2-8858444313bf)
+
+![ezgif-2-1d91b685e5](https://github.com/rcsmyth/zhang-lab-test-GUI/assets/56563089/83c28d40-6a13-412b-af39-5531945ecd78)
 
 
 version 3:
