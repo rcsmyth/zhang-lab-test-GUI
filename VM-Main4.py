@@ -10,6 +10,11 @@ import time, random
 from matplotlib.animation import FuncAnimation
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
+import matplotlib.pyplot as plt
+from matplotlib.figure import SubplotParams
+
+from concurrent.futures import ThreadPoolExecutor
+ 
 
 
 
@@ -51,21 +56,27 @@ class TestHandler:
         #
         self.is_running = False
         self.request_stop = False
+        self.views: List[tk.Widget] = []
+        self.pool = ThreadPoolExecutor(max_workers=3)
     
     def start_test(self): 
         self.start_time = time.time() 
-        self.cont_test()
+        self.is_running = True
+        self.pool.submit(self.cont_test)
+        self.rebuild_views()
 
     def cont_test(self):
+        self.is_running = True
         self.request_stop = False
         self.take_readings()
 
     def stop_test(self):
         self.request_stop = True 
+        self.rebuild_views()
 
     def take_readings(self):
         # loop -------------------------------------
-        while (self.request_stop == False):
+        while self.is_running and not self.request_stop:
             self.elapsed_min = (time.time() - self.start_time) / 60
             self.strain = random.random()
             reading = Reading(
@@ -73,9 +84,12 @@ class TestHandler:
             )
             self.readings.append(reading)
 
-    def rebuild_views(self):
-        print()
-        ############ 
+    def rebuild_views(self): 
+        for widget in self.views: 
+            if widget.winfo_exists():
+                self.root.after_idle(widget.build, {"reload": True})
+            else:
+                self.views.remove(widget)
 
 
 
@@ -129,7 +143,7 @@ class TestControls(tk.Frame):
 
     def make_start_btn(self):
         if self.handler.is_running and not self.handler.request_stop:
-            self.start_btn.configure(text="Stop")
+            self.start_btn.configure(text="Stop", command=self.handler.stop_test)
         elif not self.handler.is_running and self.handler.request_stop:
             self.start_btn.configure(text="Continue")
         elif not self.handler.is_running and not self.handler.request_stop:
@@ -144,7 +158,6 @@ class TestControls(tk.Frame):
         self.start_btn = tk.Button(self)
         self.make_start_btn()
         self.start_btn.grid(row=0, column=0, sticky="ew")
-
 
         # row 0 col 1 --------------------------------------
         self.save = tk.Button(self) 
@@ -178,6 +191,7 @@ class LivePlot(tk.Frame):
 
     def build(self):
         
+        
         self.fig = Figure(figsize =(10,5), dpi=100)
         self.axis = self.fig.add_subplot(1,1,1)
         self.fig.tight_layout()
@@ -199,16 +213,15 @@ class LivePlot(tk.Frame):
             readings = tuple(self.handler.readings)
 
             for reading in readings:
-                elapsedMin.append(reading.elapsed_min)
+                elapsedMin.append(reading.elapsedMin)
                 strain.append(reading.strain)
             
             self.axis.clear()
-            self.axis.plot(elapsedMin[-50:,], strain[-50:,])
+            self.axis.plot(elapsedMin[-50:], strain[-50:])
 
 
 
 
-    
 
 
 
