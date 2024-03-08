@@ -1,23 +1,21 @@
-import tkinter as tk
+import tkinter as tk 
 from tkinter import * 
-from tkinter.scrolledtext import ScrolledText
-from dataclasses import dataclass
-from typing import List
+from tkinter.scrolledtext import ScrolledText 
+from dataclasses import dataclass 
+from typing import List 
+import numpy as np 
 
-import time, random
-
-
-from matplotlib.animation import FuncAnimation
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from matplotlib.figure import Figure
-import matplotlib.pyplot as plt
-from matplotlib.figure import SubplotParams
-
-from concurrent.futures import ThreadPoolExecutor
- 
+import time, random 
 
 
+from matplotlib.animation import FuncAnimation 
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg 
+from matplotlib.figure import Figure 
+import matplotlib.pyplot as plt 
+from matplotlib.figure import SubplotParams 
 
+
+from concurrent.futures import ThreadPoolExecutor 
 
 
 ## DataClass: Reading ##
@@ -25,6 +23,7 @@ from concurrent.futures import ThreadPoolExecutor
 class Reading:
     elapsedMin: float
     strain: float 
+    strainRate: float
 
 
 
@@ -32,10 +31,10 @@ class Reading:
 class Test:
     """Object for holding all the data associated with a Test."""
 
-    def __init__(self): #def update name, material, etc ??? where in scalewiz
+    def __init__(self):  
         self.name = tk.StringVar()
         self.material = tk.StringVar()
-        self.freq: tk.StringVar() = "1000"
+        self.freq: tk.StringVar() = "100"
         self.notes = tk.StringVar()
 
         self.readings: List[Reading] = []
@@ -48,22 +47,22 @@ class Test:
 class TestHandler:
     def __init__(self, name: str = "Test 1"):
         self.name = name
-        self.root: tk.Tk = strainApp.ROOT 
-        self.test = Test() 
+        self.root: tk.Tk = strainApp.ROOT
+        self.test = Test()
         self.readings: List[Reading] = []
-        self.elapsed_min: float = float() #current duration
+        self.elapsed_min: float = float()
         self.strain: float = float()
-        #
+        self.strain_rate: float = float()
         self.is_running = False
         self.request_stop = False
         self.views: List[tk.Widget] = []
-        self.pool = ThreadPoolExecutor(max_workers=3)
-    
+        self.pool = ThreadPoolExecutor(max_workers=4)
+
     def start_test(self): 
         self.start_time = time.time() 
         self.is_running = True
+        #self.root.start_btn.configure(state="disabled")
         self.pool.submit(self.cont_test)
-        self.rebuild_views()
 
     def cont_test(self):
         self.is_running = True
@@ -72,17 +71,33 @@ class TestHandler:
 
     def stop_test(self):
         self.request_stop = True 
-        self.rebuild_views()
+        #self.rebuild_views()
 
     def take_readings(self):
         # loop -------------------------------------
         while self.is_running and not self.request_stop:
-            self.elapsed_min = (time.time() - self.start_time) / 60
-            self.strain = random.random()
+            self.pool.submit(self.get_strain) 
+            self.pool.submit(self.get_time) 
+            self.pool.submit(self.get_strain_rate) 
             reading = Reading(
-                elapsedMin=self.elapsed_min, strain=self.strain
+                elapsedMin=self.elapsed_min, strain=self.strain, strainRate=self.strain_rate
             )
             self.readings.append(reading)
+
+    def get_strain(self):
+        self.strain = np.sqrt(self.elapsed_min) 
+
+    def get_time(self):
+        self.elapsed_min = (time.time() - self.start_time) 
+    
+    def get_strain_rate(self): 
+        if self.elapsed_min > 0: 
+            strain_diff = self.strain - self.readings[-2].strain
+            time_diff = self.elapsed_min - self.readings[-2].elapsedMin
+            self.strain_rate = strain_diff / time_diff  
+        else:
+            self.strain_rate = 0 
+
 
     def rebuild_views(self): 
         for widget in self.views: 
@@ -140,15 +155,7 @@ class TestControls(tk.Frame):
         super().__init__(parent)
         self.handler: TestHandler = handler 
         self.build()
-
-    def make_start_btn(self):
-        if self.handler.is_running and not self.handler.request_stop:
-            self.start_btn.configure(text="Stop", command=self.handler.stop_test)
-        elif not self.handler.is_running and self.handler.request_stop:
-            self.start_btn.configure(text="Continue")
-        elif not self.handler.is_running and not self.handler.request_stop:
-            self.start_btn.configure(text="Start", command=self.handler.start_test)
-
+ 
 
     def build(self):
         self.grid_columnconfigure(0, weight=1)
@@ -156,13 +163,13 @@ class TestControls(tk.Frame):
 
         # row 0 col 0 --------------------------------------
         self.start_btn = tk.Button(self)
-        self.make_start_btn()
+        self.start_btn.configure(text="Start", state="normal", command=self.handler.start_test)
         self.start_btn.grid(row=0, column=0, sticky="ew")
 
         # row 0 col 1 --------------------------------------
-        self.save = tk.Button(self) 
-        self.save.configure(text="Save")
-        self.save.grid(row=0, column=1, sticky="ew")
+        self.stop = tk.Button(self) 
+        self.stop.configure(text="Stop", state="disabled", command=self.handler.stop_test)
+        self.stop.grid(row=0, column=1, sticky="ew")
 
         # row 1 --------------------------------------
         self.log_text = ScrolledText(
@@ -179,9 +186,8 @@ class TestControls(tk.Frame):
 
 
 
-
-## LivePlot.py ## 
-class LivePlot(tk.Frame):
+## StrainPlot.py ## 
+class StrainPlot(tk.Frame):
     """Renders data from a TestHandler as it is collected."""
 
     def __init__(self, parent: tk.Frame, handler: TestHandler):
@@ -191,34 +197,63 @@ class LivePlot(tk.Frame):
 
     def build(self):
         
+        self.fig, (self.strainplt, self.strainrateplt) = plt.subplots(2,
+            figsize=(15,8),
+            dpi=100,
+            constrained_layout=True,
+            subplotpars=SubplotParams(left=0.5, bottom=0.1, right=0.95, top=0.95),
+            sharex=True
+        )
         
-        self.fig = Figure(figsize =(10,5), dpi=100)
-        self.axis = self.fig.add_subplot(1,1,1)
-        self.fig.tight_layout()
 
-        self.axis.set_xlabel("Time (s)")
-        self.axis.set_ylabel("Strain Rate")
-        self.axis.grid(color="darkgrey", alpha=0.65, linestyle="-")
-        self.axis.set_facecolor("w")
+        self.strainplt.set_ylabel("Strain")
+        self.strainplt.grid(color="darkgrey", alpha=0.65, marker='o', linestyle='')
+        self.strainplt.set_facecolor("w")
+
+
+        self.strainrateplt.set_xlabel("Time (s)")
+        self.strainrateplt.set_ylabel("Strain Rate")
+        self.strainrateplt.grid(color="darkgrey", alpha=0.65, marker='o', linestyle='')
+        self.strainrateplt.set_facecolor("w")
  
+
         canvas = FigureCanvasTkAgg(self.fig, master=self)
         canvas.get_tk_widget().grid()
         interval = float(self.handler.test.freq)
-        self.ani = FuncAnimation(fig = self.fig, func = self.animate, interval=interval)
+        self.ani = FuncAnimation(self.fig, self.animate, interval=interval)
+
+
 
     def animate(self, interval):
         if self.handler.is_running:
             elapsedMin = []
             strain = []
+            strainRate = []
             readings = tuple(self.handler.readings)
 
             for reading in readings:
                 elapsedMin.append(reading.elapsedMin)
                 strain.append(reading.strain)
-            
-            self.axis.clear()
-            self.axis.plot(elapsedMin[-50:], strain[-50:])
+                strainRate.append(reading.strainRate)
 
+            
+            self.strainplt.clear()
+            self.strainrateplt.clear()
+
+
+            with plt.style.context("bmh"):
+                self.strainplt.set_ylabel("Strain")
+                self.strainplt.grid(color="darkgrey", linestyle='dashed', marker='o', markerfacecolor='blue')
+                self.strainplt.set_facecolor("w")
+                self.strainplt.margins(0, tight=True) 
+                self.strainplt.plot(elapsedMin, strain)
+
+                self.strainrateplt.set_xlabel("Time (s)")
+                self.strainrateplt.set_ylabel("Strain Rate")
+                self.strainrateplt.grid(color="darkgrey", linestyle='dashed', marker='o', markerfacecolor='blue')
+                self.strainrateplt.set_facecolor("w")
+                self.strainrateplt.margins(0, tight=True) 
+                self.strainrateplt.plot(elapsedMin, strainRate)
 
 
 
@@ -235,7 +270,8 @@ class MainFrame(tk.Frame):
 
         self.parent: tk.Frame = parent
         self.handler = TestHandler()
-        self.plot: LivePlot = None
+        self.strainplot: StrainPlot = None
+        self.strainplot2: StrainPlot = None
         self.build()
 
     def build(self):
@@ -252,9 +288,11 @@ class MainFrame(tk.Frame):
 
         # row 0 col 1 ---------------------------------------
         plt_frm = tk.Frame(self)
-        self.plot = LivePlot(plt_frm, self.handler)
-        self.plot.grid(row=0, column=0, stick="nsew")
+        self.strainplot = StrainPlot(plt_frm, self.handler)
+        self.strainplot.grid(row=0, column=0, stick="nsew")
         plt_frm.grid(row=0, column=1, rowspan=2)
+
+                
 
         
 
@@ -269,7 +307,12 @@ class strainApp(tk.Frame):
         parent.resizable(0, 0)
         parent.tk_setPalette(background="#FAFAFA")
         
+        self.winfo_toplevel().protocol("WM_DELETE_WINDOW", self.close)
+
         MainFrame(self).grid() 
+
+    def close(self) -> None:
+        self.quit()
 
 
 
@@ -280,6 +323,9 @@ def main():
     strainApp.ROOT = root
     strainApp(root).grid()
     root.mainloop()
- 
+
+
+     
+
 if __name__ == "__main__":
     main()
