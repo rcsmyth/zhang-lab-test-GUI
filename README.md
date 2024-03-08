@@ -1,5 +1,10 @@
 # zhang-lab-test-GUI
 
+version 4.1 (current):
+
+![ezgif-7-aa227436a0](https://github.com/rcsmyth/zhang-lab-test-GUI/assets/56563089/51c80b82-8ca1-47bd-bb69-6886459fb57c)
+
+
 version 4:
 
 ![ezgif-2-1d91b685e5](https://github.com/rcsmyth/zhang-lab-test-GUI/assets/56563089/83c28d40-6a13-412b-af39-5531945ecd78)
